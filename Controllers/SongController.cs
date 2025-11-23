@@ -1,79 +1,119 @@
-using lab1.Data;
-using lab1.Models;
+using lab2.DTOs;        
+using lab2.Models;      
+using lab2.Repositories;
 using Microsoft.AspNetCore.Mvc;
 
-namespace lab1.Controllers
+namespace lab2.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     public class SongController : ControllerBase
     {
-        private readonly List<Song> _songs;
-        private readonly List<Playlist> _playlists;
-
-        public SongController()
+       private readonly ISongRepository _repository;
+       private readonly IPlaylistRepository _playlistRepository;
+        public SongController(ISongRepository repository, IPlaylistRepository playlistRepository)
         {
-            _songs = DataSet.songs;
-            _playlists = DataSet.playlists;
+            _repository = repository;
+            _playlistRepository = playlistRepository;
         }
 
         //getAll
         [ApiConventionMethod(typeof(DefaultApiConventions), nameof(DefaultApiConventions.Get))]
         [HttpGet(Name = "GetAllSongs")]
-        public IEnumerable<Song> GetAll()
+        public async Task<ActionResult<IEnumerable<OutputSongDto>>> GetAll()
         {
-            return _songs;
+            var songs = await _repository.GetAllAsync();
+
+            var result = songs.Select(s => new OutputSongDto
+            {
+                Id = s.Id,
+                Title = s.Title,
+                Artist = s.Artist,
+                DurationSeconds = s.DurationSeconds,
+                PlaylistId = s.PlaylistId
+            });
+
+            return Ok(result);
         }
 
         //getAllById
         [ApiConventionMethod(typeof(DefaultApiConventions), nameof(DefaultApiConventions.Get))]
         [HttpGet("{id:int:min(1)}", Name = "GetSongById")]
-        public IActionResult Get(int id)
+        public async Task<ActionResult<OutputSongDto>> Get(int id)
         {
-            var song = _songs.FirstOrDefault(s => s.Id == id);
-            return song != null ? Ok(song) : NotFound();
+            var song = await _repository.GetByIdAsync(id);
+
+            if (song == null)
+            {
+                return NotFound();
+            }
+
+            var dto = new OutputSongDto
+            {
+                Id = song.Id,
+                Title = song.Title,
+                Artist = song.Artist,
+                DurationSeconds = song.DurationSeconds,
+                PlaylistId = song.PlaylistId
+            };
+
+            return Ok(dto);
         }
 
         //createSong
         [ApiConventionMethod(typeof(DefaultApiConventions), nameof(DefaultApiConventions.Post))]
         [HttpPost(Name = "AddSong")]
-        public IActionResult Post([FromBody] Song song)
+        public async Task<ActionResult<OutputSongDto>> Post([FromBody] CreateSongDto songDto)
         {
-            var validationError = ValidateSong(song);
-            if (validationError != null)
+           var playlist = await _playlistRepository.GetById(songDto.PlaylistId);
+            
+            if (playlist == null)
             {
-                return validationError;
+                return NotFound($"Playlist with ID {songDto.PlaylistId} not found.");
             }
 
-            DataSet.MaxSongId++;
-            song.Id = DataSet.MaxSongId;
+            var song = new Song
+            {
+                Title = songDto.Title!,
+                Artist = songDto.Artist!,
+                DurationSeconds = songDto.DurationSeconds,
+                PlaylistId = songDto.PlaylistId
+            };
 
-            _songs.Add(song);
+            await _repository.AddAsync(song);
 
-            return CreatedAtAction(nameof(Get), new { id = song.Id }, song);
+            var outputDto = new OutputSongDto
+            {
+                Id = song.Id,
+                Title = song.Title,
+                Artist = song.Artist,
+                DurationSeconds = song.DurationSeconds,
+                PlaylistId = song.PlaylistId
+            };
+
+            return CreatedAtAction(nameof(Get), new { id = song.Id }, outputDto);
         }
 
         //UpdateSongById
         [ApiConventionMethod(typeof(DefaultApiConventions), nameof(DefaultApiConventions.Put))]
         [HttpPut("{id:int:min(1)}", Name = "UpdateSong")]
-        public IActionResult Put(int id, Song song)
+        public async Task<IActionResult> Put(int id, [FromBody] CreateSongDto songDto)
         {
-            var existingSong = _songs.FirstOrDefault(s => s.Id == id);
-            if (existingSong == null)
+            var existingSong = await _repository.GetByIdAsync(id);
+            if (existingSong == null) return NotFound("Song not found");
+
+            var playlist = await _playlistRepository.GetById(songDto.PlaylistId);
+            if (playlist == null)
             {
-                return NotFound();
+                return NotFound($"Playlist with ID {songDto.PlaylistId} not found.");
             }
 
-            var validationError = ValidateSong(song);
-            if (validationError != null)
-            {
-                return validationError;
-            }
+            existingSong.Title = songDto.Title!;
+            existingSong.Artist = songDto.Artist!;
+            existingSong.DurationSeconds = songDto.DurationSeconds;
+            existingSong.PlaylistId = songDto.PlaylistId;
 
-            existingSong.Title = song.Title;
-            existingSong.Artist = song.Artist;
-            existingSong.DurationSeconds = song.DurationSeconds;
-            existingSong.PlaylistId = song.PlaylistId;
+            await _repository.UpdateAsync(existingSong);
 
             return NoContent();
         }
@@ -81,47 +121,25 @@ namespace lab1.Controllers
         //deleteAll
         [ApiConventionMethod(typeof(DefaultApiConventions), nameof(DefaultApiConventions.Delete))]
         [HttpDelete(Name = "DeleteAllSongs")]
-        public IActionResult DeleteAll()
+        public async Task<IActionResult> DeleteAll()
         {
-            _songs.Clear();
-            
-            DataSet.MaxSongId = 0; 
-
-            return NoContent();
+            await _repository.DeleteAll();
+            return NoContent(); 
         }
 
         //deleteById
         [ApiConventionMethod(typeof(DefaultApiConventions), nameof(DefaultApiConventions.Delete))]
         [HttpDelete("{id:int:min(1)}", Name = "DeleteSong")]
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var song = _songs.FirstOrDefault(s => s.Id == id);
+            var song = await _repository.GetByIdAsync(id);
             if (song == null)
             {
                 return NotFound();
             }
 
-            _songs.Remove(song);
+            await _repository.DeleteAsync(id);
             return NoContent();
-        }
-
-        private IActionResult? ValidateSong(Song song)
-        {
-            if (song == null) return BadRequest("Song data is null.");
-
-            if (string.IsNullOrEmpty(song.Title) || song.Title == "string")
-                return BadRequest("Title is invalid.");
-
-            if (string.IsNullOrEmpty(song.Artist) || song.Artist == "string")
-                return BadRequest("Artist is invalid.");
-
-            if (song.DurationSeconds <= 0)
-                return BadRequest("Duration must be greater than 0.");
-
-            if (!_playlists.Any(p => p.Id == song.PlaylistId))
-                return NotFound($"Playlist with ID {song.PlaylistId} not found.");
-
-            return null;
         }
     }
 }

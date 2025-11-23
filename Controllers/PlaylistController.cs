@@ -1,6 +1,7 @@
-using lab1.Data;
-using lab1.Models;
+using lab2.Models;
+using lab2.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using lab2.DTOs;
 
 namespace lab1.Controllers
 {
@@ -8,81 +9,88 @@ namespace lab1.Controllers
     [ApiController]
     public class PlaylistController : ControllerBase
     {
-        private readonly List<Playlist> _playlists;
+        private readonly IPlaylistRepository _repository;
 
-        public PlaylistController()
+        public PlaylistController(IPlaylistRepository repository)
         {
-            _playlists = DataSet.playlists;
+            _repository = repository;
         }
 
         //getAll
         [ApiConventionMethod(typeof(DefaultApiConventions), nameof(DefaultApiConventions.Get))]
         [HttpGet(Name = "GetAllPlaylists")]
-        public IEnumerable<Playlist> GetAll()
+       public async Task<ActionResult<IEnumerable<OutputPlaylistDto>>> GetAll()
         {
-            return _playlists;
+            var playlists = await _repository.GetAll();
+
+            var result = playlists.Select(p => new OutputPlaylistDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Description = p.Description,
+                IsPublic = p.IsPublic
+            });
+
+            return Ok(result);
         }
 
         //getAllById
         [ApiConventionMethod(typeof(DefaultApiConventions), nameof(DefaultApiConventions.Get))]
-        [HttpGet("{id:int:min(1)}", Name = "GetPlaylistById")]
-        public IActionResult Get(int id)
+       [HttpGet("{id:int:min(1)}", Name = "GetPlaylistById")]
+        public async Task<ActionResult<OutputPlaylistDto>> Get(int id)
         {
-            var playlist = _playlists.FirstOrDefault(p => p.Id == id);
-            return playlist != null ? Ok(playlist) : NotFound();
+            var playlist = await _repository.GetById(id);
+            if (playlist == null) return NotFound();
+
+            var dto = new OutputPlaylistDto
+            {
+                Id = playlist.Id,
+                Name = playlist.Name,
+                Description = playlist.Description,
+                IsPublic = playlist.IsPublic
+            };
+
+            return Ok(dto);
         }
 
         //createPlaylist
         [ApiConventionMethod(typeof(DefaultApiConventions), nameof(DefaultApiConventions.Post))]
         [HttpPost(Name = "AddPlaylist")]
-        public IActionResult Post([FromBody] Playlist playlist)
+        public async Task<ActionResult<OutputPlaylistDto>> Post([FromBody] CreatePlaylistDto dto)
         {
-            var validationError = ValidatePlaylist(playlist);
-            if (validationError != null)
+            var playlist = new Playlist
             {
-                return validationError;
-            }
+                Name = dto.Name!,
+                Description = dto.Description!,
+                IsPublic = dto.IsPublic
+            };
 
-            DataSet.MaxPlayListId++;
-            playlist.Id = DataSet.MaxPlayListId;
+            await _repository.Add(playlist);
 
-            _playlists.Add(playlist);
+            var outputDto = new OutputPlaylistDto
+            {
+                Id = playlist.Id,
+                Name = playlist.Name,
+                Description = playlist.Description,
+                IsPublic = playlist.IsPublic
+            };
 
-            return CreatedAtAction(nameof(Get), new { id = playlist.Id }, playlist);
+            return CreatedAtAction(nameof(Get), new { id = playlist.Id }, outputDto);
         }
 
         //UpdateSongById
         [ApiConventionMethod(typeof(DefaultApiConventions), nameof(DefaultApiConventions.Put))]
         [HttpPut("{id:int:min(1)}", Name = "UpdatePlaylist")]
-        public IActionResult Put(int id, Playlist playlist)
+        public async Task<IActionResult> Put(int id, [FromBody] CreatePlaylistDto dto)
         {
-            var existingPlaylist = _playlists.FirstOrDefault(p => p.Id == id);
-            if (existingPlaylist == null)
-            {
-                return NotFound();
-            }
+            var existingPlaylist = await _repository.GetById(id);
+            if (existingPlaylist == null) return NotFound();
 
-            var validationError = ValidatePlaylist(playlist);
-            if (validationError != null)
-            {
-                return validationError;
-            }
+            existingPlaylist.Name = dto.Name!;
+            existingPlaylist.Description = dto.Description!;
+            existingPlaylist.IsPublic = dto.IsPublic;
 
-            existingPlaylist.Name = playlist.Name;
-            existingPlaylist.Description = playlist.Description;
-            existingPlaylist.IsPublic = playlist.IsPublic;
-
-            return NoContent();
-        }
-
-        //deleteAll
-        [ApiConventionMethod(typeof(DefaultApiConventions), nameof(DefaultApiConventions.Delete))]
-        [HttpDelete(Name = "DeleteAllPlaylists")]
-        public IActionResult DeleteAll()
-        {
-            _playlists.Clear();
-
-            DataSet.MaxPlayListId = 0;
+            await _repository.Update(existingPlaylist);
 
             return NoContent();
         }
@@ -90,29 +98,13 @@ namespace lab1.Controllers
         //deleteById
         [ApiConventionMethod(typeof(DefaultApiConventions), nameof(DefaultApiConventions.Delete))]
         [HttpDelete("{id:int:min(1)}", Name = "DeletePlaylist")]
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var playlist = _playlists.FirstOrDefault(p => p.Id == id);
-            if (playlist == null)
-            {
-                return NotFound();
-            }
+            var playlist = await _repository.GetById(id);
+            if (playlist == null) return NotFound();
 
-            _playlists.Remove(playlist);
+            await _repository.Delete(id);
             return NoContent();
-        }
-        
-        private IActionResult? ValidatePlaylist(Playlist playlist)
-        {
-            if (playlist == null) return BadRequest("Playlist data is null.");
-
-            if (string.IsNullOrEmpty(playlist.Name) || playlist.Name == "string")
-                return BadRequest("Name is invalid. Please provide a real name.");
-
-            if (playlist.Description == "string")
-                return BadRequest("Description is invalid. Please provide a real description or leave empty.");
-
-            return null;
         }
     }
 }
