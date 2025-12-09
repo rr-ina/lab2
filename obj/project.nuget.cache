@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "AblbEFNfL/k=",
+  "dgSpecHash": "gzH2M7K5oeQ=",
   "success": true,
-  "projectFilePath": "D:\\web\\rr-ina\\lab2\\lab2.csproj",
+  "projectFilePath": "D:\\web\\rr-ina\\web-lab3\\lab2.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Дарія\\.nuget\\packages\\fluentvalidation\\11.11.0\\fluentvalidation.11.11.0.nupkg.sha512",
     "C:\\Users\\Дарія\\.nuget\\packages\\fluentvalidation.aspnetcore\\11.3.1\\fluentvalidation.aspnetcore.11.3.1.nupkg.sha512",

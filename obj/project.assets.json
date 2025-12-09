@@ -3381,11 +3381,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\web\\rr-ina\\lab2\\lab2.csproj",
+      "projectUniqueName": "D:\\web\\rr-ina\\web-lab3\\lab2.csproj",
       "projectName": "lab2",
-      "projectPath": "D:\\web\\rr-ina\\lab2\\lab2.csproj",
+      "projectPath": "D:\\web\\rr-ina\\web-lab3\\lab2.csproj",
       "packagesPath": "C:\\Users\\Дарія\\.nuget\\packages\\",
-      "outputPath": "D:\\web\\rr-ina\\lab2\\obj\\",
+      "outputPath": "D:\\web\\rr-ina\\web-lab3\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
